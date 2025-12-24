@@ -55,7 +55,7 @@ cd backend
 cd frontend
 flutter pub get
 flutter run
-For emulator, the backend runs on http://10.0.2.2:8081
+For emulator, the backend runs on local adresse
 need to change localhost adresse in the baseURL of the api.dart file to your computer local host
 
 Trade-offs & Limitations (possible improvments)
