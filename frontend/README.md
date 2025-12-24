@@ -1,16 +1,20 @@
 # appointment_app
 
-A new Flutter project.
+Flutter Application
 
-## Getting Started
+This Flutter application provides the patient-facing interface of the secure appointment booking system.
 
-This project is a starting point for a Flutter application.
+It allows users to:
 
-A few resources to get you started if this is your first Flutter project:
+Authenticate securely using JWT
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+View upcoming appointments
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Book consultations based on doctor availability
+
+Cancel or reschedule existing appointments
+
+Refresh appointment data with pull-to-refresh gestures
+
+The app communicates with a Spring Boot backend via REST APIs and handles loading states, errors, and session expiration gracefully.
+All sensitive logic and business rules are enforced by the backend to ensure security.
