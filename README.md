@@ -42,11 +42,18 @@ behavior protection and control:
 - Availability is revalidated server-side
 - Backend ignores any client-side manipulation
 
+v2 update: 
+-data base integeration
+-DDD archetecture implementation
+-interface optimisation
+
 
 
 ## How to Run
 
 ### Backend
+data base: 
+docker compose up -d (or any PostgreSQL instance) #the data base will be created auto using flyway and migration with 3 users to login and 3 doctors to choose from
 cd backend
 ./mvnw spring-boot:run
 
@@ -57,11 +64,4 @@ flutter pub get
 flutter run
 For emulator, the backend runs on local adresse
 need to change localhost adresse in the baseURL of the api.dart file to your computer local host
-
-Trade-offs & Limitations (possible improvments)
-No database (in-memory storage only)
-No refresh tokens (re-login on expiration)
-Doctor availability is mocked
-no entry control
-no user profile
 
