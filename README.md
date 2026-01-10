@@ -43,9 +43,9 @@ behavior protection and control:
 - Backend ignores any client-side manipulation
 
 v2 update: 
--data base integeration
--DDD archetecture implementation
--interface optimisation
+- data base integeration
+- DDD archetecture implementation
+- interface optimisation
 
 
 
@@ -53,7 +53,10 @@ v2 update:
 
 ### Backend
 data base: 
-docker compose up -d (or any PostgreSQL instance) #the data base will be created auto using flyway and migration with 3 users to login and 3 doctors to choose from
+docker compose up -d (or any PostgreSQL instance)
+
+#the data base will be created auto using flyway and migration with 3 users to login and 3 doctors to choose from
+
 cd backend
 ./mvnw spring-boot:run
 
