@@ -1,113 +1,126 @@
 package com.rmm.doctor_opointement.controllers;
 
-import com.rmm.doctor_opointement.dto.appointment.CreateAppointmentRequest;
-import com.rmm.doctor_opointement.model.Appointment;
-import com.rmm.doctor_opointement.model.Doctor;
-import com.rmm.doctor_opointement.model.Patient;
-import com.rmm.doctor_opointement.Security.AuthUser;
-import com.rmm.doctor_opointement.services.AppointmentService;
-import com.rmm.doctor_opointement.services.DoctorService;
-import com.rmm.doctor_opointement.services.PatientService;
 
+
+import com.rmm.doctor_opointement.model.appointment;
+import com.rmm.doctor_opointement.services.AppointmentService;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+
 
 import java.time.LocalDateTime;
 import java.util.List;
+
+import com.rmm.doctor_opointement.services.DoctorService;
+import com.rmm.doctor_opointement.model.Doctor;
 import java.util.Map;
+
+
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @RestController
 @RequestMapping("/appointments")
 public class AppointmentController {
 
     private final AppointmentService appointmentService;
-    private final DoctorService doctorService;
-    private final PatientService patientService;
+   
+private final DoctorService doctorService;
 
-    public AppointmentController(
-            AppointmentService appointmentService,
-            DoctorService doctorService,
-            PatientService patientService
-    ) {
-        this.appointmentService = appointmentService;
-        this.doctorService = doctorService;
-        this.patientService = patientService;
-    }
+   public AppointmentController(
+    AppointmentService appointmentService,
+    DoctorService doctorService
+) {
+    this.appointmentService = appointmentService;
+    this.doctorService = doctorService;
+}
 
-    private Patient currentPatient() {
-        Authentication auth =
-                SecurityContextHolder.getContext().getAuthentication();
-
-        AuthUser user = (AuthUser) auth.getPrincipal();
-
-        return patientService.findByUserId(user.getId());
-    }
-
-    // ================= CREATE =================
     @PostMapping
-    public Appointment create(@RequestBody CreateAppointmentRequest req) {
+    public appointment create(@RequestBody CreateAppointmentRequest req) {
 
-        Patient patient = currentPatient();
-        Doctor doctor = doctorService.findById(req.doctorId());
+        Long patientId = Long.valueOf(
+            SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName()
+        );
 
         return appointmentService.create(
-                patient,
-                doctor,
-                req.startTime(),
-                req.endTime()
+            patientId,
+            req.doctorId(),
+            req.startTime(),
+            req.endTime()
         );
     }
 
-    // ================= READ =================
-    @GetMapping("/me")
-    public List<Map<String, Object>> myAppointments() {
+@GetMapping("/me")
+public List<Map<String, Object>> myAppointments() {
 
-        Patient patient = currentPatient();
+    Long patientId = Long.valueOf(
+        SecurityContextHolder.getContext()
+            .getAuthentication()
+            .getName()
+    );
 
-        return appointmentService.findByPatient(patient)
-                .stream()
-                .map(a -> Map.of(
-                        "id", a.getId(),
-                        "doctor", Map.of(
-                                "id", a.getDoctor().getId(),
-                                "name", a.getDoctor().getName(),
-                                "speciality", a.getDoctor().getSpeciality()
-                        ),
-                        "startTime", a.getStartTime(),
-                        "endTime", a.getEndTime(),
-                        "status", a.getStatus()
-                ))
-                .toList();
-    }
+    return appointmentService.findByPatient(patientId)
+        .stream()
+        .map(a -> {
+            Doctor d = doctorService.findById(a.doctorId());
 
-    // ================= CANCEL =================
-    @PutMapping("/{id}/cancel")
-    public void cancel(@PathVariable Long id) {
-
-        System.out.println("canceling appointement "+ id);
-
-        Patient patient = currentPatient();
-        appointmentService.cancelByPatient(id, patient);
-    }
-
-    // ================= RESCHEDULE =================
-    @PutMapping("/{id}/reschedule")
-    public Appointment reschedule(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> body
-    ) {
-
-        Patient patient = currentPatient();
-
-        LocalDateTime startTime = LocalDateTime.parse(body.get("startTime"));
-        LocalDateTime endTime = LocalDateTime.parse(body.get("endTime"));
-
-        return appointmentService.rescheduleByPatient(
-                id,
-                patient,
-                startTime,
-                endTime
-        );
-    }
+            return Map.of(
+                "id", a.id(),
+                "doctor", Map.of(
+                    "id", d.id(),
+                    "name", d.name(),
+                    "speciality", d.speciality()
+                ),
+                "startTime", a.startTime(),
+                "endTime", a.endTime()
+            );
+        })
+        .toList();
 }
+
+@PutMapping("/{id}/cancel")
+public void cancel(@PathVariable Long id) {
+
+    Long patientId = Long.valueOf(
+        SecurityContextHolder.getContext()
+            .getAuthentication()
+            .getName()
+    );
+
+    appointmentService.cancelByPatient(id, patientId);
+}
+
+@PutMapping("/{id}/reschedule")
+public void reschedule(
+        @PathVariable Long id,
+        @RequestBody Map<String, String> body
+) {
+
+    Long patientId = Long.valueOf(
+        SecurityContextHolder.getContext()
+            .getAuthentication()
+            .getName()
+    );
+
+    LocalDateTime startTime =
+        LocalDateTime.parse(body.get("startTime"));
+    LocalDateTime endTime =
+        LocalDateTime.parse(body.get("endTime"));
+
+    appointmentService.rescheduleByPatient(
+        id,
+        patientId,
+        startTime,
+        endTime
+    );
+}
+
+
+}
+
+record CreateAppointmentRequest(
+    Long doctorId,
+    LocalDateTime startTime,
+    LocalDateTime endTime
+) {}
+

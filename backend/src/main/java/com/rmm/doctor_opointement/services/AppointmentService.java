@@ -1,137 +1,133 @@
 package com.rmm.doctor_opointement.services;
 
-import java.time.LocalDateTime;
-import java.util.List;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
+import com.rmm.doctor_opointement.model.appointment;
+
+
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
-import com.rmm.doctor_opointement.model.Appointment;
-import com.rmm.doctor_opointement.model.Doctor;
-import com.rmm.doctor_opointement.model.Patient;
-import com.rmm.doctor_opointement.repository.AppointmentRepository;
 
-import jakarta.transaction.Transactional;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 @Service
 public class AppointmentService {
 
-    private final AppointmentRepository appointmentRepository;
+    private final List<appointment> appointments = new ArrayList<>();
+    private final AtomicLong idGenerator = new AtomicLong(1);
 
-    public AppointmentService(AppointmentRepository appointmentRepository) {
-        this.appointmentRepository = appointmentRepository;
-    }
-
-    // ================= CREATE =================
-    @Transactional
-    public Appointment create(
-            Patient patient,
-            Doctor doctor,
+    public appointment create(
+            Long patientId,
+            Long doctorId,
             LocalDateTime start,
             LocalDateTime end
     ) {
-        boolean conflict =
-                appointmentRepository.existsOverlapping(
-                        doctor, start, end
-                );
+        // Check overlap
+        boolean conflict = appointments.stream().anyMatch(a ->
+            a.doctorId().equals(doctorId) &&
+            a.startTime().isBefore(end) &&
+            start.isBefore(a.endTime())
+        );
 
         if (conflict) {
             throw new IllegalStateException("Time slot not available");
         }
 
-        Appointment appointment = new Appointment();       
-        appointment.setPatient(patient);
-        appointment.setDoctor(doctor);
-        appointment.setStartTime(start);
-        appointment.setEndTime(end);
-        appointment.setStatus("CONFIRMED");
-        appointment.setCreatedAt(LocalDateTime.now());
+        appointment appointment = new appointment(
+            idGenerator.getAndIncrement(),
+            patientId,
+            doctorId,
+            start,
+            end
+        );
 
-        return appointmentRepository.save(appointment);
+        appointments.add(appointment);
+        return appointment;
     }
 
-    // ================= READ =================
-    public List<Appointment> findByPatient(Patient patient) {
-        return appointmentRepository.findByPatient(patient);
+    public List<appointment> findByPatient(Long patientId) {
+        return appointments.stream()
+                .filter(a -> a.patientId().equals(patientId))
+                .collect(Collectors.toList());
     }
 
-    // ================= CANCEL =================
-    @Transactional
-    public void cancelByPatient(Long appointmentId, Patient patient) {
-
-        System.out.print("trying to cancel"+appointmentId+"for patient " + patient);
-
-        Appointment a = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found"));
-
-        if (!a.getPatient().equals(patient)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Forbidden");
-        }
-
-        if (a.getStartTime().isBefore(LocalDateTime.now().plusHours(1))) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Too late to cancel");
-        }
-
-        a.setStatus("CANCELLED");
-        appointmentRepository.save(a);
-    }
-
-    // ================= RESCHEDULE =================
-    @Transactional
-    public Appointment rescheduleByPatient(
-            Long appointmentId,
-            Patient patient,
-            LocalDateTime newStart,
-            LocalDateTime newEnd
-    ) {
-
-        Appointment old = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found"));
-
-        if (!old.getPatient().equals(patient)) {
-            throw new RuntimeException("Forbidden");
-        }
-
-        if (old.getStartTime().isBefore(LocalDateTime.now().plusHours(1))) {
-            throw new RuntimeException("Too late to modify");
-        }
-
-        boolean conflict =
-                appointmentRepository.existsOverlappingExcluding(
-                        old.getDoctor(),
-                        newStart,
-                        newEnd,
-                        old.getId()
-                );
-
-        if (conflict) {
-            throw new IllegalStateException("Time slot not available");
-        }
-
-        old.setStartTime(newStart);
-        old.setEndTime(newEnd);
-
-        return appointmentRepository.save(old);
-    }
-
-    /**
-     * @param doctorId
-     * @param start
-     * @param end
-     * @return
-     */
-    public boolean isSlotFree(
-        Doctor doctor,
-        LocalDateTime start,
-        LocalDateTime end
-) {
-    return !appointmentRepository.existsOverlapping(
-            doctor, start, end
+    public boolean isFree(Long doctorId, String date, String time) {
+    return appointments.stream().noneMatch(a ->
+        a.doctorId().equals(doctorId) &&
+        a.startTime().toLocalDate().toString().equals(date) &&
+        a.startTime().toLocalTime().toString().startsWith(time)
     );
 }
 
+public void cancelByPatient(Long appointmentId, Long patientId) {
+
+    appointment a = appointments.stream()
+        .filter(ap -> ap.id().equals(appointmentId))
+        .findFirst()
+        .orElseThrow(() -> new RuntimeException("Appointment not found"));
+
+    if (!a.patientId().equals(patientId)) {
+        throw new RuntimeException("Forbidden");
+    }
+
+    if (a.startTime().isBefore(LocalDateTime.now().plusHours(1))) {
+        throw new RuntimeException("Too late to cancel");
+    }
+
+    // remove appointment (slot becomes free)
+    appointments.remove(a);
 }
+
+public appointment rescheduleByPatient(
+        Long appointmentId,
+        Long patientId,
+        LocalDateTime newStart,
+        LocalDateTime newEnd
+) {
+
+    appointment old = appointments.stream()
+        .filter(ap -> ap.id().equals(appointmentId))
+        .findFirst()
+        .orElseThrow(() -> new RuntimeException("Appointment not found"));
+
+    if (!old.patientId().equals(patientId)) {
+        throw new RuntimeException("Forbidden");
+    }
+
+    if (old.startTime().isBefore(LocalDateTime.now().plusHours(1))) {
+        throw new RuntimeException("Too late to modify");
+    }
+
+    // check conflicts (EXCLUDE current appointment)
+    boolean conflict = appointments.stream().anyMatch(a ->
+        !a.id().equals(old.id()) &&
+        a.doctorId().equals(old.doctorId()) &&
+        a.startTime().isBefore(newEnd) &&
+        newStart.isBefore(a.endTime())
+    );
+
+    if (conflict) {
+        throw new IllegalStateException("Time slot not available");
+    }
+
+    // replace appointment
+    appointments.remove(old);
+
+    appointment updated = new appointment(
+        old.id(),
+        old.patientId(),
+        old.doctorId(),
+        newStart,
+        newEnd
+    );
+
+    appointments.add(updated);
+    return updated;
+}
+
+
+
+}
+

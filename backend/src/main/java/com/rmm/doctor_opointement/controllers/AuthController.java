@@ -1,71 +1,44 @@
 package com.rmm.doctor_opointement.controllers;
 
+import java.util.Map;
 
-
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
-import com.rmm.doctor_opointement.Security.AuthUser;
-import com.rmm.doctor_opointement.Security.JwtUtil;
-import com.rmm.doctor_opointement.dto.LoginRequest;
-import com.rmm.doctor_opointement.dto.LoginResponse;
-
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-
-
+import com.rmm.doctor_opointement.Security.JWTutil;
+import com.rmm.doctor_opointement.model.User;
+import com.rmm.doctor_opointement.services.UserService;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
 
-    private final AuthenticationManager authenticationManager;
-    private final JwtUtil jwtUtil;
+    private final UserService userService;
+    private final JWTutil jwtUtil;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil) {
-        this.authenticationManager = authenticationManager;
+    public AuthController(UserService userService, JWTutil jwtUtil) {
+        this.userService = userService;
         this.jwtUtil = jwtUtil;
     }
 
-  @PostMapping("/login")
-public LoginResponse login(@RequestBody LoginRequest request) {
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest req) {
+        try {
+            User user = userService.authenticate(
+                req.username(),
+                req.password()
+            );
 
-  
+            return ResponseEntity.ok(
+                Map.of("token", jwtUtil.generate(user))
+            );
 
-    try {
-   Authentication authentication = authenticationManager.authenticate(
-        new UsernamePasswordAuthenticationToken(
-            request.getEmail(), 
-            request.getPassword()
-          
-        )
-
-        
-    );
-
-   AuthUser user = (AuthUser) authentication.getPrincipal();
-
-      String token = jwtUtil.generateToken(
-        user.getId(),
-        user.getUsername(),
-        user.getRole()
-    );
-
-    return new LoginResponse(token);
-
-
-
-} catch (BadCredentialsException ex) {
-        throw new ResponseStatusException(
-            HttpStatus.UNAUTHORIZED,
-            "Invalid email or password"
-        );
+        } catch (RuntimeException e) {
+            return ResponseEntity
+                .status(401)
+                .body("Invalid credentials");
+        }
     }
+}
 
-
-}}
-
+record LoginRequest(String username, String password) {}
