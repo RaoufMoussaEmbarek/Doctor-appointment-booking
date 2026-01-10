@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: doctor_postgres
+    environment:
+      POSTGRES_DB: doctor_app
+      POSTGRES_USER: doctor_app
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
